@@ -1,0 +1,387 @@
+##way older
+# from moviepy import VideoFileClip, vfx
+
+# def apply_dynamic_zoom(clip):
+#     """
+#     Adds a very slow zoom-in effect to a static image video 
+#     to keep the viewer engaged.
+#     """
+#     # Zoom in by 10% over the duration of the clip
+#     return clip.fx(vfx.zoom, lambda t: 1 + 0.02*t)
+
+# def process_static_short(input_path, start, end, output_path):
+#     clip = VideoFileClip(input_path).subclip(start, end)
+    
+#     # 1. Reframe to 9:16 (Shorts format)
+#     w, h = clip.size
+#     target_w = h * (9/16)
+#     clip = clip.crop(x_center=w/2, y_center=h/2, width=target_w, height=h)
+    
+#     # 2. Add Motion
+#     moving_clip = apply_dynamic_zoom(clip)
+    
+#     # 3. Save
+#     moving_clip.write_videofile(output_path, codec="libx264")
+
+
+# from moviepy import VideoFileClip, ImageClip, CompositeVideoClip
+
+# def apply_ken_burns(image_path, duration=3):
+#     return ImageClip(image_path).set_duration(duration).resize(lambda t: 1 + 0.04 * t)
+
+# def assemble_final_video(original_video, plan, broll_images):
+#     main_clip = VideoFileClip(original_video).subclip(plan['start'], plan['end'])
+    
+#     # Layering B-roll over the main clip
+#     elements = [main_clip]
+#     for i, img_path in enumerate(broll_images):
+#         # Position B-roll at the planned timestamp
+#         start_time = plan['broll'][i]['time'] - plan['start']
+#         broll_clip = apply_ken_burns(img_path).set_start(start_time).set_position("center")
+#         elements.append(broll_clip)
+        
+#     final = CompositeVideoClip(elements)
+#     final.write_videofile("output/final_short.mp4", codec="libx264")
+
+
+
+
+
+
+
+# old code for reference:
+# def create_karaoke_word_group_clips(
+#     word_group,
+#     clip_size,
+#     font_path,
+#     font_size,
+#     normal_color,
+#     highlight_color,
+#     stroke_width=4,
+#     position_y=0.78,
+# ):
+#     """Create a bottom subtitle block with karaoke-style word highlighting."""
+#     clips = []
+#     # max_text_width = int(clip_size[0] * 0.9)
+#     group_text = " ".join(word["word"] for word in word_group)
+#     # print(f"max_text_width: {max_text_width}")
+    
+#     group_start = word_group[0]["start"]
+#     group_end = max(word["end"] for word in word_group)
+#     group_duration = max(0.1, group_end - group_start)
+#     # print(f"Creating word group clip: '{group_text}' from {group_start:.2f}s to {group_end:.2f}s")
+    
+#     safe_height = int(font_size * 1.8)  # Add some padding to prevent cutoff
+
+#     base_clip = TextClip(
+#         text=group_text,
+#         font=font_path,
+#         font_size=font_size,
+#         color=normal_color,
+#         stroke_color="black",
+#         stroke_width=stroke_width,
+#         method="label",
+#         # size=(max_text_width, None),
+#         size=(None, safe_height), # Limit height to prevent cutoff
+#         text_align="center",
+#         # interline=4,
+#     ).with_start(group_start).with_duration(group_duration)
+
+#     # text_height = base_clip.size[1] if base_clip.size else font_size + 10
+#     # bottom_padding = max(20, int(clip_size[1] * 0.12)) # Ensure at least 60px padding from the bottom
+#     # vertical_position = clip_size[1] - bottom_padding - text_height
+#     # vertical_position = max(vertical_position, int(clip_size[1] * 0.5))  # Ensure it doesn't go too high
+#     # base_clip = base_clip.with_position(("center", vertical_position))
+
+#     # calculate vertical position based on clip size and desired bottom margin
+#     # text_height = base_clip.size[1] + (stroke_width * 2)
+#     # 15% from the bottom is usually the "sweet spot" for subtitles
+#     # target_bottom_margin = int(clip_size[1] * 0.15)
+#     # The Y coordinate is the TOP of the text block
+#     # vertical_position = clip_size[1] - target_bottom_margin - text_height
+#     # vertical_position = int(clip_size[1] - text_height - 250)  # Start with a fixed margin of 250px from the bottom, adjust if text is too tall
+#     # Prevent the text from being pushed off the top or bottom
+#     # vertical_position = max(20, min(vertical_position, clip_size[1] - text_height - 20))
+    
+#     # Create a helper variable to ensure Y is identical for all clips
+#     # Subtracting 20% of the screen height ensures it's safely "up"
+#     # safe_y = clip_size[1] - (font_size * 2) 
+
+#     ## new change
+#     vertical_position = int(clip_size[1] - safe_height - 250)
+
+#     base_clip = base_clip.with_position(("center", vertical_position))
+    
+
+#     # # Apply this to both base_clip and highlight_clip
+#     # base_clip = base_clip.with_position(("center", safe_y))
+#     # highlight_clip = highlight_clip.with_position(("center", safe_y))
+#     full_width = base_clip.size[0]
+#     clips.append(base_clip)
+#     print(f"Screen Height: {clip_size[1]}, Text Y: {vertical_position}, Text Height: {base_clip.size[1]}")
+#     # print(f"Base clip for group '{group_text}' created with size: {base_clip.size} and bottom padding: {bottom_padding} and vertical position: {vertical_position}")
+    
+#     # word_widths = []
+#     # for word in word_group:
+#     #     temp_clip = TextClip(
+#     #         text=word["word"],
+#     #         font=font_path,
+#     #         font_size=font_size,
+#     #         color=normal_color,
+#     #         stroke_color="black",
+#     #         stroke_width=stroke_width,
+#     #         method="label",
+#     #     )
+#     #     # word_widths.append(temp_clip.size[0] if temp_clip.size else font_size * len(word["word"]))
+#     #     word_widths.append(temp_clip.size[0])
+#     #     temp_clip.close()
+
+#     # # space_width = int(font_size * 0.28)
+#     # # Calculate the exact space width for this specific font
+#     # space_clip = TextClip(text=" ", font=font_path, font_size=font_size, method="label")
+#     # space_width = space_clip.size[0]
+#     # space_clip.close()
+#     # total_width = sum(word_widths) + space_width * (len(word_group) - 1)
+#     # current_x = int(max(0, (clip_size[0] - total_width) // 2))
+
+#     # for idx, word in enumerate(word_group):
+#     #     word_start = max(0, word["start"])
+#     #     word_end = max(word_start + 0.05, word["end"])
+#     #     word_duration = max(0.05, word_end - word_start)
+
+#     #     highlight_clip = TextClip(
+#     #         text=word["word"],
+#     #         font=font_path,
+#     #         font_size=font_size,
+#     #         color=highlight_color,
+#     #         stroke_color="black",
+#     #         stroke_width=stroke_width,
+#     #         method="label",
+#     #         size=(word_widths[idx], safe_height), # Ensure the highlight has the same height as the base clip
+#     #     ).with_start(word_start).with_duration(word_duration).with_position((current_x, vertical_position))
+
+#     #     clips.append(highlight_clip)
+#     #     current_x += word_widths[idx] + space_width
+
+#     # 3. Highlight Clips
+#     # Instead of rendering single words, we render the FULL string in color
+#     # and "crop" it to show only the active word.
+#     for word in word_group:
+#         word_start = max(0, word["start"])
+#         word_end = max(word_start + 0.05, word["end"])
+#         word_duration = max(0.05, word_end - word_start)
+
+#         # Create the full text string in the highlight color
+#         # This ensures the kerning/spacing is EXACTLY the same as base_clip
+#         full_highlight_string = TextClip(
+#             text=group_text,
+#             font=font_path,
+#             font_size=font_size,
+#             color=highlight_color,
+#             stroke_color="black",
+#             stroke_width=stroke_width,
+#             method="label",
+#             size=(full_width, safe_height),
+#         ).with_start(word_start).with_duration(word_duration)
+
+#         # Find the pixel boundaries of the specific word within the string
+#         # We calculate where this word starts and ends relative to the full string
+#         # Note: This requires getting the word's position in the rendered text
+#         # Since that is hard in MoviePy, we use a simpler cropping trick:
+        
+#         # Determine crop coordinates (this part is the logic fix)
+#         # To avoid the "shifting" issue, we use the full-width clip 
+#         # but we use a "Mask" to only show the word.
+        
+#         # If masking is too complex, the most reliable way to avoid drift:
+#         highlight_clip = full_highlight_string.with_position(("center", vertical_position))
+        
+#         # We use a "Mask" to hide everything except the current word
+#         # (Alternatively, simply use the single word but force size/alignment)
+#         # Let's try the absolute most stable alignment:
+        
+#         highlight_clip = TextClip(
+#             text=word["word"],
+#             font=font_path,
+#             font_size=font_size,
+#             color=highlight_color,
+#             stroke_color="black",
+#             stroke_width=stroke_width,
+#             method="label",
+#             size=(None, safe_height), # Force height to match base
+#         ).with_start(word_start).with_duration(word_duration)
+
+#         # THE CRITICAL FIX FOR DRIFT:
+#         # Instead of 'center', calculate the position relative to the base_clip's left edge
+#         # Find index of word in string to estimate position
+#         preceding_text = group_text[:group_text.find(word["word"])]
+        
+#         # Render the preceding text to find out how wide it is
+#         if preceding_text:
+#             offset_clip = TextClip(text=preceding_text, font=font_path, font_size=font_size, method="label", stroke_width=stroke_width)
+#             offset_x = offset_clip.size[0]
+#             offset_clip.close()
+#         else:
+#             offset_x = 0
+            
+#         # Calculate X: (Screen Center - Half of Full Width) + Preceding Width
+#         start_x = (clip_size[0] - full_width) // 2
+#         highlight_clip = highlight_clip.with_position((int(start_x + offset_x), vertical_position))
+
+#         clips.append(highlight_clip)
+
+#     return clips
+
+
+#create preview code
+# for entry in transcript_data:
+            #     start_t = float(entry['start']) - float(start)
+            #     end_t = float(entry['end']) - float(start)
+            #     duration = end_t - start_t
+                
+            #     if end_t <= 0 or start_t >= new_clip.duration:
+            #         continue
+
+            #     start_t = max(0, start_t)
+
+            #     # Split text into chunks of max 4 words
+            #     text_chunks = split_into_chunks(entry['text'], max_words=4)
+            #     chunk_text = '\n'.join(text_chunks)
+
+            #     caption = create_karaoke_caption(chunk_text, duration, new_clip.size, is_active=False)
+            #     caption = caption.with_start(start_t).with_position(('center', int(new_clip.h * 0.62)))
+            #     elements.append(caption)
+
+            #     # Active green highlight on top
+            #     active_word = create_karaoke_caption(entry['text'], duration, new_clip.size, is_active=True)
+            #     active_word = (active_word
+            #                 .with_start(start_t)
+            #                 .with_position(('center', int(new_clip.h * 0.62)))
+            #                 .resized(lambda t: 1.1 if t < 0.1 else 1.0))
+            #     elements.append(active_word)
+
+
+## way older code for reference:
+# def assemble_final_video(original_video, plan, broll_images):
+#     # CHANGE: .subclip -> .subclipped
+#     # main_clip = VideoFileClip(original_video).subclipped(plan['start'], plan['end'])
+    
+#     # elements = [main_clip]
+#     # 1. Load and Crop the main clip to Vertical (9:16)
+#     main_clip = VideoFileClip(original_video).subclipped(plan['start'], plan['end'])
+#     w, h = main_clip.size
+#     target_ratio = 9/16
+    
+#     # Simple center crop for vertical
+#     new_w = h * target_ratio
+#     main_clip = main_clip.cropped(x_center=w/2, width=new_w)
+    
+#     elements = [main_clip]
+    
+#     for i, img_path in enumerate(broll_images):
+#         start_time = plan['broll'][i]['time'] - plan['start']
+        
+#         # We pass the clip size to make sure it covers the video
+#         broll_clip = (apply_ken_burns(img_path, target_size=main_clip.size)
+#                       .with_start(start_time)
+#                       .with_position("center"))
+#         elements.append(broll_clip)
+        
+#     final = CompositeVideoClip(elements)
+    
+#     # Ensure the output directory exists
+#     import os
+#     if not os.path.exists("output"): 
+#         os.makedirs("output")
+        
+#     final.write_videofile("output/final_short.mp4", codec="libx264", audio_codec="aac")
+#     return "output/final_short.mp4"
+
+## assemble final video code reference:
+# 3. Add Captions from the edited transcript
+    # if transcript_data:
+    #     for entry in transcript_data:
+    #         # Adjust timing relative to the start of the clip
+    #         start_t = float(entry['start']) - float(plan['start'])
+    #         end_t = float(entry['end']) - float(plan['start'])
+    #         duration = end_t - start_t
+            
+    #         # Skip if the word is outside the clip range
+    #         if end_t <= 0 or start_t >= main_clip.duration:
+    #             continue
+
+    #         # Ensure start is within bounds
+    #         start_t = max(0, start_t)
+
+    #         # Split text into chunks of max 4 words
+    #         text_chunks = split_into_chunks(entry['text'], max_words=4)
+    #         chunk_text = '\n'.join(text_chunks)
+
+    #         # 1. Base white caption
+    #         base_word = create_karaoke_caption(chunk_text, duration, main_clip.size, is_active=False)
+    #         base_word = base_word.with_start(start_t).with_position(('center', int(main_clip.h * 0.62)))
+    #         elements.append(base_word)
+
+    #         # 2. Active green highlight on top (also chunked)
+    #         active_word = create_karaoke_caption(chunk_text, duration, main_clip.size, is_active=True)
+    #         active_word = (active_word
+    #                     .with_start(start_t)
+    #                     .with_position(('center', int(main_clip.h * 0.62)))
+    #                     .resized(lambda t: 1.1 if t < 0.1 else 1.0))
+    #         elements.append(active_word)
+
+            # phrase_elements = []
+            # for i, entry in enumerate(transcript_data):
+            #     start_t = float(entry['start']) - float(plan['start'])
+            #     end_t = float(entry['end']) - float(plan['start'])
+            #     duration = end_t - start_t
+                
+            #     if start_t < 0 or start_t >= main_clip.duration:
+            #         continue
+
+            #     # 1. The 'Static' White Shadow (The background of the karaoke)
+            #     # This stays white for the duration of the word
+            #     base_word = create_karaoke_caption(entry['text'], duration, main_clip.size, is_active=False)
+            #     base_word = base_word.with_start(start_t).with_position(('center', int(main_clip.h * 0.7)))
+            #     elements.append(base_word)
+
+            #     # 2. The 'Active' Green Highlight + Zoom
+            #     # This sits on top and 'pops'
+            #     active_word = create_karaoke_caption(entry['text'], duration, main_clip.size, is_active=True)
+            #     active_word = (active_word
+            #                 .with_start(start_t)
+            #                 .with_position(('center', int(main_clip.h * 0.7)))
+            #                 # Simple 'Pop' animation: start slightly larger and scale down
+            #                 .resized(lambda t: 1.1 if t < 0.1 else 1.0)) 
+                
+            #     elements.append(active_word)
+            # Create the text clip
+            # txt_clip = (TextClip(entry['text'], 
+            #                     fontsize=70, 
+            #                     color='yellow', 
+            #                     stroke_color='black', 
+            #                     stroke_width=2, 
+            #                     font='Arial-Bold', 
+            #                     method='caption', 
+            #                     size=(main_clip.w * 0.8, None))
+            #             .with_start(start_t)
+            #             .with_duration(duration)
+            #             .with_position(('center', h * 0.7))) # Positioned in lower third
+            # txt_clip = TextClip(
+            #     text=entry['text'],           # Explicitly name the text argument
+            #     font_size=70,                 # MoviePy 2.0 uses font_size, not fontsize
+            #     color='yellow', 
+            #     font=r"C:\Windows\Fonts\arialbd.ttf",            # Make sure this is the only time 'font' is mentioned
+            #     stroke_color='black', 
+            #     stroke_width=2, 
+            #     method='caption', 
+            #     size=(int(main_clip.w * 0.8), None)
+            # )
+
+            # # Apply the timing and positioning AFTER the creation
+            # txt_clip = (txt_clip
+            #             .with_start(start_t)
+            #             .with_duration(duration)
+            #             .with_position(('center', int(main_clip.h * 0.7))))
+            
+            # elements.append(txt_clip)

@@ -1,0 +1,334 @@
+import streamlit as st
+import os
+import json
+import pandas as pd
+
+from utils.downloader import download_yt
+from utils.transcriber import transcribe
+from utils.highlights import get_viral_highlights
+from utils.image_gen import generate_broll_images
+from utils.visualizer import assemble_final_video, create_fast_preview
+from app import check_environment
+
+st.set_page_config(page_title="Vid Gen UI", layout="wide")
+
+# @st.cache_resource
+# def load_pipeline():
+#     pipe = StableDiffusionXLPipeline.from_pretrained(
+#         "stabilityai/sdxl-turbo", 
+#         torch_dtype=torch.float16, 
+#         variant="fp16"
+#     ).to("cuda")
+#     pipe.enable_model_cpu_offload()
+#     return pipe
+
+# # Use it like this:
+# pipeline = load_pipeline()
+
+@st.cache_resource
+def initialize_environment():
+    """Run environment checks only once per session."""
+    check_environment()
+    return True
+
+# Initialize environment on first load
+initialize_environment()
+
+# Helper to ensure we have a single float
+def ensure_float(val):
+    if isinstance(val, list):
+        return float(val[0]) # Take the first item if it's a list
+    return float(val)
+    
+# Initialize Session State    
+if 'transcript' not in st.session_state:
+    st.session_state.transcript = None
+if 'plan' not in st.session_state:
+    st.session_state.plan = None
+if 'video_path' not in st.session_state:
+    st.session_state.video_path = "input_video.mp4"
+if 'preview_path' not in st.session_state:
+    st.session_state.preview_path = None
+if 'analysis_running' not in st.session_state:
+    st.session_state.analysis_running = False
+
+# --- SIDEBAR: CONTROLS ---
+with st.sidebar:
+    st.title("⚙️ AI Director")
+    disabled_input = st.session_state.plan is not None or st.session_state.analysis_running
+    vid_input = st.text_input("Youtube Link:", st.session_state.video_path, disabled=disabled_input)
+    
+     # If clicked, set a session lock and run the long job under the spinner.
+    if st.button("Step 1: AI Analysis", type="primary", disabled=disabled_input):
+        st.session_state.analysis_running = True
+        st.rerun() # Rerun to trigger the spinner and run the analysis in the main area
+
+    if st.session_state.analysis_running:
+        with st.spinner("🎬 Analyzing video..."):
+            try:
+                # 1. Download & Transcribe
+                video_file = download_yt(vid_input)
+                st.session_state.video_path = video_file
+                transcript = transcribe(video_file)
+                st.session_state.transcript = transcript
+
+                # Save plan and unlock when done
+                st.session_state.plan = get_viral_highlights(transcript)
+
+                # Create the Opus-style preview instantly
+                st.session_state.preview_path = create_fast_preview(
+                    st.session_state.video_path, 
+                    st.session_state.plan['start'], 
+                    st.session_state.plan['end']
+                )
+            except Exception as exc:
+                st.error(f"Analysis failed: {exc}")
+            finally:
+                st.session_state.analysis_running = False
+                st.rerun() # Rerun to update the UI with results
+        st.success("Analysis Complete!")
+
+# --- MAIN AREA: TIMELINE EDITOR ---
+if st.session_state.plan:
+    # Get total video duration for the slider
+    # if 'total_duration' not in st.session_state:
+    #     with VideoFileClip(st.session_state.video_path) as clip:
+    #         st.session_state.total_duration = clip.duration
+            
+    # --- TOP ACTION BAR ---
+    col_a, col_b = st.columns([3, 1])
+    with col_a:
+        st.subheader(f"🎬 Highlight: {st.session_state.plan.get('reason', 'Viral Clip')}")
+    with col_b:
+        # This button triggers the heavy AI generation
+        render_ready = st.button("🚀 Render Final Short", type="primary", use_container_width=True)
+
+    # --- THE DUAL PANEL VIEW ---
+    col_left, col_right = st.columns([1, 1], gap="medium")
+
+    with col_left:
+        st.markdown("### 📝 Transcript Editor")
+        # Show the transcript exactly like Opus
+        edited_transcript = st.data_editor(
+            st.session_state.transcript,
+            column_config={"text": st.column_config.TextColumn("Dialogue", width="large")},
+            use_container_width=True,
+            height=500
+        )
+
+    with col_right:
+        st.markdown("### 📺 Video Preview")
+        # Show the video starting at the AI's selected time
+        st.video(st.session_state.video_path, start_time=int(ensure_float(st.session_state.plan['start'])))
+        
+        # Timeline Range Slider right under the video
+        clip_range = st.slider(
+            "Adjust Clip Timing", 
+            0.0, total_duration, 
+            (ensure_float(st.session_state.plan['start']), ensure_float(st.session_state.plan['end']))
+        )
+    
+    # --- B-ROLL PROMPT SECTION (Bottom) ---
+    st.markdown("---")
+    st.subheader("📸 AI B-Roll Prompts")
+    st.info("Edit these AI prompts to change what the B-roll images will look like.")
+    
+    updated_broll = []
+    # Use the cues from the AI plan
+    broll_cues = st.session_state.plan.get('broll', [])
+
+    # We create a 2-column grid so the boxes are nice and wide
+    for i in range(0, len(broll_cues), 2):
+        row_cols = st.columns(2)
+        
+        # Left Prompt Card
+        with row_cols[0]:
+            cue = broll_cues[i]
+            st.markdown(f"**Visual #{i+1}**")
+            n_time = st.number_input(f"Start Time (s)", value=ensure_float(cue['time']), key=f"time_{i}")
+            n_prompt = st.text_area(f"Image Prompt", value=cue['prompt'], height=100, key=f"prompt_{i}")
+            updated_broll.append({"time": n_time, "prompt": n_prompt})
+            
+        # Right Prompt Card (if there is an even number of cues)
+        if i + 1 < len(broll_cues):
+            with row_cols[1]:
+                cue = broll_cues[i+1]
+                st.markdown(f"**Visual #{i+2}**")
+                n_time = st.number_input(f"Start Time (s)", value=ensure_float(cue['time']), key=f"time_{i+1}")
+                n_prompt = st.text_area(f"Image Prompt", value=cue['prompt'], height=100, key=f"prompt_{i+1}")
+                updated_broll.append({"time": n_time, "prompt": n_prompt})
+
+    # st.markdown("---")
+    # st.subheader("📸 AI B-Roll Prompts")
+    # updated_broll = []
+    
+    # # Display b-roll as a grid of text areas
+    # b_cols = st.columns(len(st.session_state.plan['broll']))
+    # for i, cue in enumerate(st.session_state.plan['broll']):
+    #     with b_cols[i]:
+    #         new_time = st.number_input(f"Time (s)", value=ensure_float(cue['time']), key=f"t_{i}")
+    #         new_prompt = st.text_area(f"Image {i+1} Prompt", value=cue['prompt'], height=100, key=f"p_{i}")
+    #         updated_broll.append({"time": new_time, "prompt": new_prompt})
+
+    # # --- RENDER EXECUTION ---
+    # if render_ready:
+    #     # Update the plan with all UI edits
+    #     st.session_state.plan['start'] = clip_range[0]
+    #     st.session_state.plan['end'] = clip_range[1]
+    #     st.session_state.plan['broll'] = updated_broll
+    #     st.session_state.transcript = edited_transcript # Save corrected text
+
+        # --- RENDER EXECUTION ---
+    if render_ready:
+        # 1. Update the session plan with the LATEST UI values
+        st.session_state.plan['start'] = clip_range[0]
+        st.session_state.plan['end'] = clip_range[1]
+        st.session_state.plan['broll'] = updated_broll
+        # Use the edited transcript text for captions
+        current_transcript = edited_transcript.to_dict('records') 
+
+        with st.status("🚀 Processing your Short...", expanded=True) as status:
+            # Clear old images from memory/list
+            broll_paths = []
+            
+            # 2. Generate AI Visuals based on YOUR edited prompts
+            st.write("🎨 Generating AI B-Roll images...")
+            for i, cue in enumerate(updated_broll):
+                image_filename = f"output/broll_{i}.png"
+                status.write(f"Creating Image {i+1}: {cue['prompt'][:40]}...")
+                
+                # Call your image_gen logic
+                path = generate_broll_images(cue['prompt'], image_filename)
+                broll_paths.append(path)
+            
+            # 3. Assemble Final Video
+            st.write("🎬 Combining video, captions, and B-roll...")
+            # Note: We pass the edited transcript so captions are 100% correct
+            final_video_path = assemble_final_video(
+                st.session_state.video_path, 
+                st.session_state.plan, 
+                broll_paths,
+                transcript_data=current_transcript 
+            )
+            
+            status.update(label="✅ Video Ready!", state="complete", expanded=False)
+        
+        # 4. Display the result
+        st.divider()
+        st.balloons()
+        st.success("Your AI Short is ready for download!")
+        st.video(final_video_path)
+        
+        with open(final_video_path, "rb") as file:
+            st.download_button("📥 Download Short", file, file_name="ai_short.mp4")
+
+else:
+    st.info("👈 Enter a YouTube URL in the sidebar to get started.")
+# st.header("📝 Transcript Editor")
+
+# if st.session_state.transcript is not None:
+#     # 1. Create the editable table
+#     edited_df = st.data_editor(
+#         st.session_state.transcript,
+#         column_config={
+#             "start": st.column_config.NumberColumn("Start (s)", format="%.2f"),
+#             "end": st.column_config.NumberColumn("End (s)", format="%.2f"),
+#             "text": st.column_config.TextColumn("Dialogue", width="large"),
+#         },
+#         hide_index=True,
+#         use_container_width=True,
+#         num_rows="dynamic" # Allow adding/deleting lines!
+#     )
+    
+#     # 2. Update session state with edits
+#     if st.button("💾 Save Edits & Find Viral Hook"):
+#         st.session_state.transcript = edited_df
+#         # Convert back to list of dicts for Gemma 3
+#         transcript_list = edited_df.to_dict('records')
+#         st.session_state.plan = get_viral_highlights_and_prompts(transcript_list)
+#         st.success("Transcript updated! Viral highlights recalculated.")
+
+# --- STEP 2: EDIT TRANSCRIPT (Only shows when data exists) ---
+# if st.session_state.transcript is not None:
+#     st.header("📝 Edit Transcript")
+#     st.write("Correct any AI errors below before finding viral moments.")
+    
+#     # Editable table
+#     edited_df = st.data_editor(
+#         st.session_state.transcript,
+#         column_config={
+#             "text": st.column_config.TextColumn("Dialogue", width="large"),
+#         },
+#         use_container_width=True,
+#         key="transcript_editor"
+#     )
+
+#     if st.button("✨ Find Viral Highlights"):
+#         # Pass the EDITED text to your highlight logic
+#         # If edited_df is already a list, just use it!
+#         if isinstance(edited_df, list):
+#             transcript_list = edited_df
+#         else:
+#             # If it's a DataFrame, then convert it
+#             transcript_list = edited_df.to_dict('records')
+#         # ... call your Gemma 3 logic here ...
+#         st.session_state.plan = get_viral_highlights(transcript_list)
+#         st.success("Viral highlights updated!")
+# else:
+#     st.info("👈 Enter a YouTube URL in the sidebar to get started.")
+
+# --- MAIN AREA: TIMELINE EDITOR ---
+# if st.session_state.plan:
+#     st.header("🎞️ Video Timeline")
+    
+#     # Range Slider for Clip Start/End
+#     # We use a tuple (start, end) to create the 'range' look
+#     total_duration = 300.0 # You can get this from VideoFileClip(vid).duration
+#     # clip_range = st.slider(
+#     #     "Select Clip Range", 
+#     #     0.0, total_duration, 
+#     #     (float(st.session_state.plan['start']), float(st.session_state.plan['end']))
+#     # )
+
+#     start_val = ensure_float(st.session_state.plan['start'])
+#     end_val = ensure_float(st.session_state.plan['end'])
+
+#     clip_range = st.slider(
+#         "Select Clip Range", 
+#         0.0, total_duration, 
+#         (start_val, end_val)
+#     )
+    
+#     st.divider()
+    
+#     st.subheader("📸 AI B-Roll & Prompts")
+#     updated_broll = []
+    
+#     # Create rows for each B-Roll moment
+#     for i, cue in enumerate(st.session_state.plan['broll']):
+#         col1, col2 = st.columns([1, 3])
+#         with col1:
+#             # Time slider limited to be WITHIN the clip range
+#             new_time = st.slider(f"Image {i+1} Time", clip_range[0], clip_range[1], float(cue['time']))
+#         with col2:
+#             new_prompt = st.text_area(f"Image {i+1} Prompt", value=cue['prompt'], height=70)
+        
+#         updated_broll.append({"time": new_time, "prompt": new_prompt})
+
+#     # --- RENDER SECTION ---
+#     st.divider()
+#     if st.button("🚀 Render Final Video", use_container_width=True):
+#         st.session_state.plan['start'] = clip_range[0]
+#         st.session_state.plan['end'] = clip_range[1]
+#         st.session_state.plan['broll'] = updated_broll
+        
+#         with st.status("Rendering...") as status:
+#             st.write("Creating AI Visuals...")
+#             # Loop for generate_broll_images...
+#             st.write("Combining Layers...")
+#             # Call assemble_final_video...
+#             status.update(label="Complete!", state="complete")
+        
+#         st.video("output/final_short.mp4")
+# else:
+#     st.info("👈 Upload or link a video and click 'AI Analysis' to start.")

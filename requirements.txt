@@ -1,0 +1,12 @@
+moviepy
+faster-whisper
+mediapipe
+ollama
+python-dotenv
+yt-dlp
+torch 
+diffusers 
+streamlit
+transformers
+opencv-python
+numpy
