@@ -1,0 +1,2 @@
+# Streamlit config to allow larger video uploads
+server.maxUploadSize = 1024

@@ -40,7 +40,7 @@ def check_environment():
         os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\bin"
         if not shutil.which("ffmpeg"):
             raise RuntimeError("FFmpeg not found! Please ensure it's in C:\ffmpeg\bin")
-    print("✅ FFmpeg is ready.")
+    print("FFmpeg is ready.")
 
     # 2. Check Ollama
     try:
@@ -48,10 +48,10 @@ def check_environment():
         import requests
         requests.get("http://localhost:11434")
     except:
-        print("⚠️ Ollama not running. Attempting to start...")
+        print("Ollama is not running. Attempting to start...")
         subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(3) # Give it a moment to wake up
-    print("✅ Ollama is ready.")
+    print("Ollama is ready.")
 
 def main():
     try:
@@ -82,7 +82,7 @@ def main():
             broll_images.append(path)
         
         print(f"Generated B-roll images: {broll_images}")
-        print("🚀 Assembling final video with dynamic zoom and B-roll...")
+        print("Assembling final video with dynamic zoom and B-roll...")
         # Assemble final video with B-roll and dynamic zoom effects
         plan = {
             "start": 0,
@@ -95,10 +95,10 @@ def main():
         }
         final_video = assemble_final_video(video_file, plan, broll_images)
         
-        print(f"🚀 Success! Your short is ready: {final_video}")
+        print(f"Success! Your short is ready: {final_video}")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
